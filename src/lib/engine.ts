@@ -70,7 +70,7 @@ export function classifyOne(
     return { ...t, merchant, category: UNCATEGORIZED, confidence: 0.2, reasoning: "No known keyword matched — please review.", alternatives: [], source: "unknown" };
   }
   const total = scores.reduce((a, s) => a + s.score, 0);
-  const top = scores[0];
+  const top = scores[0]!;
   let confidence = 0.55 + 0.4 * (top.score / total);
   if (top.score >= 6) confidence += 0.04;
   confidence = Math.min(0.97, confidence);
@@ -119,7 +119,7 @@ export function analyze(
       unusual = `${(amt / s.mean).toFixed(1)}× the average ${b.category} spend (₹${Math.round(s.mean)}).`;
     } else {
       const m = (byMerchant.get(b.merchant) ?? []).map((x) => Math.abs(x.amount)).sort((x, y) => x - y);
-      const med = m[Math.floor(m.length / 2)];
+      const med = m[Math.floor(m.length / 2)] ?? 0;
       if (m.length >= 3 && amt > 3 * med) unusual = `3×+ your usual spend at ${b.merchant}.`;
     }
     return { ...b, recurring: recurring.has(b.merchant), unusual };
@@ -147,7 +147,7 @@ export function recommendations(rows: Classified[]): string[] {
 
 export function parseCSV(text: string): Txn[] {
   const lines = text.trim().split(/\r?\n/);
-  const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
+  const header = (lines[0] ?? "").toLowerCase().split(",").map((h) => h.trim());
   const di = header.findIndex((h) => h.includes("date"));
   const de = header.findIndex((h) => h.includes("desc") || h.includes("narration") || h.includes("merchant"));
   const am = header.findIndex((h) => h.includes("amount"));

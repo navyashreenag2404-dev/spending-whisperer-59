@@ -141,7 +141,7 @@ function Index() {
             <h2 className="text-xl">Review transactions</h2>
             <div className="flex gap-2 text-sm">
               {[["all", "All"], ["review", "Needs review"], ["unusual", "Unusual"], ["recurring", "Recurring"]].map(([k, l]) => (
-                <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3 py-1 ${filter === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{l}</button>
+                <button key={k} onClick={() => setFilter(k!)} className={`rounded-full px-3 py-1 ${filter === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{l}</button>
               ))}
             </div>
           </div>
