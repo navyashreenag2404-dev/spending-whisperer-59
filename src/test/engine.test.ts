@@ -24,3 +24,12 @@ describe("engine", () => {
     expect(r.find((x) => x.merchant === m)!.category).toBe("Groceries");
   });
 });
+
+describe("unusual spending", () => {
+  it("flags big one-off purchases but not normal bills", () => {
+    const r = analyze(txns, DEFAULT_CATEGORIES, {}, {});
+    expect(r.find((x) => x.description.includes("FLIPKART"))!.unusual).not.toBeNull();
+    expect(r.find((x) => x.description === "SWIGGY ORDER 12001")!.unusual).not.toBeNull();
+    expect(r.find((x) => x.description.includes("NETFLIX"))!.unusual).toBeNull();
+  });
+});
