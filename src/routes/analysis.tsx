@@ -43,7 +43,7 @@ function Analysis() {
         <div className={card}>
           <h2 className="text-xl">By category</h2>
           <div className="h-64">
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={totals} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={2}>
                   {totals.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
@@ -65,7 +65,7 @@ function Analysis() {
           <div className={card}>
             <h2 className="text-xl">Top category trends</h2>
             <div className="mt-2 h-56">
-              <ResponsiveContainer>
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={trend}>
                   <XAxis dataKey="month" fontSize={12} stroke="var(--muted-foreground)" />
                   <YAxis fontSize={12} stroke="var(--muted-foreground)" tickFormatter={(v) => `₹${v / 1000}k`} />

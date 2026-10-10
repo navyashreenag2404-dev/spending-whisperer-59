@@ -115,7 +115,11 @@ export function analyze(
     const amt = Math.abs(b.amount);
     const s = stats.get(b.category)!;
     let unusual: string | null = null;
-    if (s.n >= 4 && s.sd > 0 && amt > s.mean + 2 * s.sd) {
+    const catAmts = [...(byCat.get(b.category) ?? [])].sort((x, y) => x - y);
+    const catMedian = catAmts[Math.floor(catAmts.length / 2)] ?? 0;
+    if (b.category !== UNCATEGORIZED && s.n >= 4 && amt >= 5000 && amt > 4 * catMedian) {
+      unusual = `${(amt / catMedian).toFixed(1)}× your typical ${b.category} spend (₹${Math.round(catMedian)}).`;
+    } else if (s.n >= 4 && s.sd > 0 && amt > s.mean + 2 * s.sd) {
       unusual = `${(amt / s.mean).toFixed(1)}× the average ${b.category} spend (₹${Math.round(s.mean)}).`;
     } else {
       const m = (byMerchant.get(b.merchant) ?? []).map((x) => Math.abs(x.amount)).sort((x, y) => x - y);

@@ -54,7 +54,7 @@ function Dashboard() {
         <div className={`${card} lg:col-span-2`}>
           <h2 className="text-xl">Monthly spending</h2>
           <div className="mt-4 h-64">
-            <ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={months}>
                 <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `₹${v / 1000}k`} />
