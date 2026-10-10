@@ -52,7 +52,7 @@ export function classifyOne(
 ): Omit<Classified, "recurring" | "unusual"> {
   const merchant = normalizeMerchant(t.description);
   if (overrides[t.id]) {
-    return { ...t, merchant, category: overrides[t.id], confidence: 1, reasoning: "Set by you during review.", alternatives: [], source: "user" };
+    return { ...t, merchant, category: overrides[t.id]!, confidence: 1, reasoning: "Set by you during review.", alternatives: [], source: "user" };
   }
   if (learned[merchant]) {
     return { ...t, merchant, category: learned[merchant], confidence: 0.95, reasoning: `Learned from your correction for merchant "${merchant}".`, alternatives: [], source: "learned" };
