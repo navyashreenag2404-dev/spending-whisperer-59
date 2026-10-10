@@ -1,185 +1,100 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import {
-  analyze, recommendations, parseCSV, DEFAULT_CATEGORIES, UNCATEGORIZED,
-  normalizeMerchant, type Category, type Txn,
-} from "@/lib/engine";
-import { SAMPLE_CSV } from "@/lib/sample";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, Repeat, TrendingUp, Wallet } from "lucide-react";
+import { AppShell, PageHeader, card, btnGhost } from "@/components/AppShell";
+import { useApp, inr, monthlyTotals, categoryTotals } from "@/lib/store";
+import { recommendations } from "@/lib/engine";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Ledgerly — AI Transaction Categorizer" },
-      { name: "description", content: "Upload transactions, auto-categorize with reasoning, detect recurring and unusual spending, and correct in-session." },
-      { property: "og:title", content: "Ledgerly — AI Transaction Categorizer" },
-      { property: "og:description", content: "Auto-categorize transactions and spot unusual spending patterns." },
+      { title: "Dashboard — SpendSmart AI" },
+      { name: "description", content: "Your spending at a glance: totals, budget, recurring payments and unusual spend alerts." },
+      { property: "og:title", content: "Dashboard — SpendSmart AI" },
+      { property: "og:description", content: "AI-powered personal expense analysis dashboard." },
     ],
   }),
-  component: Index,
+  component: Dashboard,
 });
 
-const card = "rounded-xl border border-border bg-card p-5";
-const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
-
-function Index() {
-  const [txns, setTxns] = useState<Txn[]>(() => parseCSV(SAMPLE_CSV));
-  const [cats, setCats] = useState<Category[]>(DEFAULT_CATEGORIES);
-  const [learned, setLearned] = useState<Record<string, string>>({});
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState("all");
-  const [newCat, setNewCat] = useState({ name: "", keywords: "" });
-  const [form, setForm] = useState({ date: "2026-09-30", description: "", amount: "" });
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const rows = useMemo(() => analyze(txns, cats, learned, overrides), [txns, cats, learned, overrides]);
-  const recs = useMemo(() => recommendations(rows), [rows]);
+function Dashboard() {
+  const { rows, budget, setBudget } = useApp();
+  const months = monthlyTotals(rows);
+  const last = months[months.length - 1];
+  const prev = months[months.length - 2];
   const total = rows.reduce((a, r) => a + Math.abs(r.amount), 0);
-  const byCat = useMemo(() => {
-    const m = new Map<string, number>();
-    rows.forEach((r) => m.set(r.category, (m.get(r.category) ?? 0) + Math.abs(r.amount)));
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [rows]);
   const recurring = [...new Map(rows.filter((r) => r.recurring).map((r) => [r.merchant, r])).values()];
+  const recurringTotal = recurring.reduce((a, r) => a + r.amount, 0);
   const unusual = rows.filter((r) => r.unusual);
-  const corrections = Object.keys(learned).length;
+  const used = last ? Math.min(100, (last.value / budget) * 100) : 0;
+  const change = last && prev ? ((last.value - prev.value) / prev.value) * 100 : 0;
+  const top = categoryTotals(rows).slice(0, 5);
 
-  const shown = rows.filter((r) =>
-    filter === "all" ? true : filter === "review" ? r.confidence < 0.6 || r.alternatives.length > 0 : filter === "unusual" ? !!r.unusual : r.recurring,
-  );
-
-  const correct = (id: string, desc: string, category: string) => {
-    setOverrides((o) => ({ ...o, [id]: category }));
-    setLearned((l) => ({ ...l, [normalizeMerchant(desc)]: category }));
-  };
-
-  const onFile = async (f?: File) => {
-    if (!f) return;
-    setTxns(parseCSV(await f.text()));
-    setOverrides({});
-  };
+  const stats = [
+    { label: "Total spend", value: inr(total), icon: Wallet, note: `${rows.length} transactions` },
+    { label: "This month", value: inr(last?.value ?? 0), icon: TrendingUp, note: prev ? `${change >= 0 ? "+" : ""}${change.toFixed(0)}% vs last month` : "—" },
+    { label: "Recurring / month", value: inr(recurringTotal), icon: Repeat, note: `${recurring.length} subscriptions & bills` },
+    { label: "Unusual alerts", value: unusual.length, icon: AlertTriangle, note: "Need your attention" },
+  ];
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-7xl px-6 py-10">
-          <p className="text-sm uppercase tracking-widest opacity-80">Ledgerly</p>
-          <h1 className="mt-2 text-4xl md:text-5xl">Make sense of every transaction.</h1>
-          <p className="mt-3 max-w-2xl opacity-85">Auto-categorization with confidence & reasoning, recurring and unusual spend detection, and a model that learns from your corrections.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={() => fileRef.current?.click()} className="rounded-lg bg-accent px-4 py-2 font-semibold text-accent-foreground">Upload CSV</button>
-            <button onClick={() => { setTxns(parseCSV(SAMPLE_CSV)); setOverrides({}); setLearned({}); }} className="rounded-lg border border-primary-foreground/40 px-4 py-2">Load demo data</button>
-            <a href="/sample-transactions.csv" download className="rounded-lg border border-primary-foreground/40 px-4 py-2">Download sample CSV</a>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+    <AppShell>
+      <PageHeader title="Welcome back 👋" subtitle="Here's how your money moved recently." />
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((s) => (
+          <div key={s.label} className={card}>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">{s.label}<s.icon size={16} /></div>
+            <p className="mt-2 font-[var(--font-display)] text-3xl">{s.value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-3">
+        <div className={`${card} lg:col-span-2`}>
+          <h2 className="text-xl">Monthly spending</h2>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer>
+              <BarChart data={months}>
+                <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} />
+                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => `₹${v / 1000}k`} />
+                <Tooltip formatter={(v: number) => inr(v)} />
+                <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      </header>
+        <div className={card}>
+          <h2 className="text-xl">Monthly budget</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{last?.month ?? "—"}: {inr(last?.value ?? 0)} of {inr(budget)}</p>
+          <div className="mt-3 h-3 rounded-full bg-muted">
+            <div className={`h-3 rounded-full ${used >= 100 ? "bg-destructive" : used > 80 ? "bg-accent" : "bg-primary"}`} style={{ width: `${used}%` }} />
+          </div>
+          <p className="mt-2 text-sm">{used >= 100 ? "Over budget!" : `${inr(budget - (last?.value ?? 0))} left`}</p>
+          <label className="mt-4 block text-xs text-muted-foreground">Change budget</label>
+          <input type="range" min={10000} max={150000} step={5000} value={budget} onChange={(e) => setBudget(+e.target.value)} className="w-full accent-[var(--primary)]" />
+          <h3 className="mt-5 font-semibold">Top categories</h3>
+          <ul className="mt-2 space-y-1 text-sm">
+            {top.map((c) => <li key={c.name} className="flex justify-between"><span>{c.name}</span><span className="text-muted-foreground">{inr(c.value)}</span></li>)}
+          </ul>
+        </div>
+      </section>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
-        <section className="grid gap-4 md:grid-cols-4">
-          {[
-            ["Transactions", rows.length],
-            ["Total spend", inr(total)],
-            ["Unusual flagged", unusual.length],
-            ["Corrections learned", corrections],
-          ].map(([k, v]) => (
-            <div key={k} className={card}>
-              <p className="text-sm text-muted-foreground">{k}</p>
-              <p className="mt-1 font-[var(--font-display)] text-3xl">{v}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-3">
-          <div className={card}>
-            <h2 className="text-xl">Spend by category</h2>
-            <div className="mt-4 space-y-3">
-              {byCat.map(([c, v]) => (
-                <div key={c}>
-                  <div className="flex justify-between text-sm"><span>{c}</span><span className="text-muted-foreground">{inr(v)}</span></div>
-                  <div className="mt-1 h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-primary" style={{ width: `${(v / total) * 100}%` }} /></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className={card}>
-            <h2 className="text-xl">Recurring payments</h2>
-            <ul className="mt-4 space-y-2 text-sm">
-              {recurring.map((r) => (
-                <li key={r.merchant} className="flex justify-between rounded-lg bg-secondary px-3 py-2"><span className="capitalize">{r.merchant}</span><span>{inr(r.amount)}/mo</span></li>
-              ))}
-              {!recurring.length && <li className="text-muted-foreground">None detected.</li>}
-            </ul>
-            <h2 className="mt-6 text-xl">Unusual spending</h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              {unusual.map((r) => (
-                <li key={r.id} className="rounded-lg bg-warning px-3 py-2"><b>{r.description}</b> — {inr(r.amount)}<br /><span className="text-xs">{r.unusual}</span></li>
-              ))}
-            </ul>
-          </div>
-          <div className={card}>
-            <h2 className="text-xl">Personalized recommendations</h2>
-            <ul className="mt-4 list-disc space-y-2 pl-5 text-sm">{recs.map((r) => <li key={r}>{r}</li>)}</ul>
-            <h2 className="mt-6 text-xl">Categories</h2>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {cats.map((c) => (
-                <span key={c.name} title={c.keywords.join(", ")} className="rounded-full bg-secondary px-3 py-1 text-xs">
-                  {c.name}
-                  <button className="ml-2 text-muted-foreground" onClick={() => setCats(cats.filter((x) => x.name !== c.name))}>×</button>
-                </span>
-              ))}
-            </div>
-            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (!newCat.name) return; setCats([...cats, { name: newCat.name, keywords: newCat.keywords.split(",").map((k) => k.trim()).filter(Boolean) }]); setNewCat({ name: "", keywords: "" }); }}>
-              <input placeholder="Name" value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm" />
-              <input placeholder="keywords, comma" value={newCat.keywords} onChange={(e) => setNewCat({ ...newCat, keywords: e.target.value })} className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm" />
-              <button className="rounded-md bg-primary px-3 text-sm text-primary-foreground">Add</button>
-            </form>
-          </div>
-        </section>
-
-        <section className={card}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl">Review transactions</h2>
-            <div className="flex gap-2 text-sm">
-              {[["all", "All"], ["review", "Needs review"], ["unusual", "Unusual"], ["recurring", "Recurring"]].map(([k, l]) => (
-                <button key={k} onClick={() => setFilter(k!)} className={`rounded-full px-3 py-1 ${filter === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{l}</button>
-              ))}
-            </div>
-          </div>
-          <form className="mt-4 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (!form.description) return; setTxns([...txns, { id: `m${Date.now()}`, date: form.date, description: form.description, amount: +form.amount || 0 }]); setForm({ ...form, description: "", amount: "" }); }}>
-            <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="rounded-md border border-input bg-background px-2 py-1 text-sm" />
-            <input placeholder="Description e.g. ZOMATO ORDER 123" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm" />
-            <input placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-28 rounded-md border border-input bg-background px-2 py-1 text-sm" />
-            <button className="rounded-md bg-primary px-3 text-sm text-primary-foreground">Add transaction</button>
-          </form>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr><th className="py-2">Date</th><th>Description</th><th>Merchant</th><th className="text-right">Amount</th><th className="pl-4">Category</th><th>Confidence</th><th>Reasoning</th></tr>
-              </thead>
-              <tbody>
-                {shown.map((r) => (
-                  <tr key={r.id} className={`border-t border-border align-top ${r.unusual ? "bg-warning/50" : ""}`}>
-                    <td className="py-2 whitespace-nowrap">{r.date}</td>
-                    <td>{r.description}{r.recurring && <span className="ml-2 rounded bg-secondary px-1.5 text-xs">recurring</span>}</td>
-                    <td className="capitalize text-muted-foreground">{r.merchant}</td>
-                    <td className="text-right whitespace-nowrap">{inr(r.amount)}</td>
-                    <td className="pl-4">
-                      <select value={r.category} onChange={(e) => correct(r.id, r.description, e.target.value)} className={`rounded-md border px-2 py-1 ${r.category === UNCATEGORIZED ? "border-destructive text-destructive" : "border-input"} bg-background`}>
-                        {[...cats.map((c) => c.name), UNCATEGORIZED].map((c) => <option key={c}>{c}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <div className="h-1.5 w-16 rounded bg-muted"><div className={`h-1.5 rounded ${r.confidence < 0.6 ? "bg-destructive" : "bg-primary"}`} style={{ width: `${r.confidence * 100}%` }} /></div>
-                      <span className="text-xs text-muted-foreground">{Math.round(r.confidence * 100)}% · {r.source}</span>
-                    </td>
-                    <td className="max-w-xs text-xs text-muted-foreground">{r.reasoning}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </main>
-    </div>
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className={card}>
+          <div className="flex items-center justify-between"><h2 className="text-xl">Latest alerts</h2><Link to="/alerts" className="text-sm text-primary underline">View all</Link></div>
+          <ul className="mt-3 space-y-2 text-sm">
+            {unusual.slice(0, 4).map((r) => (
+              <li key={r.id} className="rounded-lg bg-warning px-3 py-2"><b>{r.description}</b> · {inr(r.amount)}<br /><span className="text-xs">{r.unusual}</span></li>
+            ))}
+            {!unusual.length && <li className="text-muted-foreground">No unusual spending 🎉</li>}
+          </ul>
+        </div>
+        <div className={card}>
+          <div className="flex items-center justify-between"><h2 className="text-xl">Smart tips</h2><Link to="/assistant" className={btnGhost}>Ask AI</Link></div>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">{recommendations(rows).map((r) => <li key={r}>{r}</li>)}</ul>
+        </div>
+      </section>
+    </AppShell>
   );
 }
